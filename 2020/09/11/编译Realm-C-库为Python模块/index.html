@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Golang,C++,Python," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="&amp;emsp;&amp;emsp;目前Realm数据库(NoSQL)渐渐被人使用，目标是取代以往了SQLite数据库，作为取证软件，自然要进行支持。经过查看之后发现Realm上层有Java，JavaScript，Object-C, C#等API，但是公司使用的是Golang和Python，所幸底层是用C++写的，即Realm-core。因此想要自己封装一层C++ API通过SWIG来提供给Golang和Py">
+<meta property="og:type" content="article">
+<meta property="og:title" content="编译Realm C++库为Python &amp; Golang模块">
+<meta property="og:url" content="http://yoursite.com/2020/09/11/%E7%BC%96%E8%AF%91Realm-C-%E5%BA%93%E4%B8%BAPython%E6%A8%A1%E5%9D%97/index.html">
+<meta property="og:site_name" content="yoghourt&#39;s blog">
+<meta property="og:description" content="&amp;emsp;&amp;emsp;目前Realm数据库(NoSQL)渐渐被人使用，目标是取代以往了SQLite数据库，作为取证软件，自然要进行支持。经过查看之后发现Realm上层有Java，JavaScript，Object-C, C#等API，但是公司使用的是Golang和Python，所幸底层是用C++写的，即Realm-core。因此想要自己封装一层C++ API通过SWIG来提供给Golang和Py">
+<meta property="article:published_time" content="2020-09-11T02:59:59.000Z">
+<meta property="article:modified_time" content="2021-01-22T01:51:25.985Z">
+<meta property="article:author" content="yoghourt">
+<meta property="article:tag" content="Golang">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="Python">
+<meta name="twitter:card" content="summary">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2020/09/11/编译Realm-C-库为Python模块/"/>
+
+
+
+
+
+  <title>编译Realm C++库为Python & Golang模块 | yoghourt's blog</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 4.2.1"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">yoghourt's blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/%20" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/%20" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/09/11/%E7%BC%96%E8%AF%91Realm-C-%E5%BA%93%E4%B8%BAPython%E6%A8%A1%E5%9D%97/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="yoghourt">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="yoghourt's blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">编译Realm C++库为Python & Golang模块</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-09-11T10:59:59+08:00">
+                2020-09-11
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>&emsp;&emsp;目前Realm数据库(NoSQL)渐渐被人使用，目标是取代以往了SQLite数据库，作为取证软件，自然要进行支持。经过查看之后发现Realm上层有Java，JavaScript，Object-C, C#等API，但是公司使用的是Golang和Python，所幸底层是用C++写的，即Realm-core。因此想要自己封装一层C++ API通过SWIG来提供给Golang和Python使用。</p>
+<h3 id="Windows-x64-Python-Module"><a href="#Windows-x64-Python-Module" class="headerlink" title="Windows x64 Python Module"></a>Windows x64 Python Module</h3><a id="more"></a>
+<p>经过几天的摸索已经大致封装了一层读取Realm文件的接口，因此开始自己的编译之路。</p>
+<p>大致思路如下：</p>
+<ul>
+<li>先将Realm-core整体编译成static library，即realm.lib。</li>
+<li>然后通过swig将c++接口暴露出来，得到realm_wrap.cpp。</li>
+<li>写setup.py，使用python distutils编译成Python模块。</li>
+</ul>
+<p>思路有了，但是过程折腾了很久，遇到了很多问题：</p>
+<p>一.     我通过Relm-core给的编译手册进行命令行编译之后发现，由于是MSVC编译器进行编译的，因此编译模式为/MTd，但是我自己在CLion中测试我的接口发现，CLion编译我写的接口为/MDd，导致无法连接到一起，此乃坑一。而且我想要MT,而不是带着调试信息的MTd。解决手段是直接通过Visual Studio-&gt;File-&gt;Open-&gt;CMake将整个工程导入，然后在上面Configuration中设置自己的编译版本为x64-Release。至于Clion编译为/MDd，只需要在自己的测试项目CMakeList.txt中添加:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"># 先将工程设置为Release，起码不带调试信息，这样就不可能是MTd或者MDd</span><br><span class="line">set(CMAKE_BUILD_TYPE Release)</span><br><span class="line">​</span><br><span class="line"># 添加编译选项</span><br><span class="line">if(MSVC)</span><br><span class="line">  add_compile_options(</span><br><span class="line">        $&lt;$&lt;CONFIG:Release&gt;:&#x2F;MT&gt;</span><br><span class="line">  )</span><br><span class="line">endif()</span><br></pre></td></tr></table></figure>
+<p>二.    现在拿到了realm.lib，想要开始编译Python 模块，因此开始写setup.py。</p>
+<h5 id="切记使用setup-py方式编出来的模块严重依赖Python版本号，如果用3-7编出的模块只能在3-7中使用，否则会报没有此模块。但是如果直接使用g-编出的动态库则没有此限制"><a href="#切记使用setup-py方式编出来的模块严重依赖Python版本号，如果用3-7编出的模块只能在3-7中使用，否则会报没有此模块。但是如果直接使用g-编出的动态库则没有此限制" class="headerlink" title="切记使用setup.py方式编出来的模块严重依赖Python版本号，如果用3.7编出的模块只能在3.7中使用，否则会报没有此模块。但是如果直接使用g++编出的动态库则没有此限制"></a><font style="color:red">切记使用setup.py方式编出来的模块严重依赖Python版本号，如果用3.7编出的模块只能在3.7中使用，否则会报没有此模块。但是如果直接使用g++编出的动态库则没有此限制</font></h5><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#!/usr/bin/env python</span></span><br><span class="line">​</span><br><span class="line"><span class="string">"""</span></span><br><span class="line"><span class="string">setup.py file for SWIG example</span></span><br><span class="line"><span class="string">"""</span></span><br><span class="line">​</span><br><span class="line"><span class="keyword">from</span> distutils.core <span class="keyword">import</span> setup, Extension</span><br><span class="line">​</span><br><span class="line">example_module = Extension(<span class="string">'_realmHelper'</span>,</span><br><span class="line">                           include_dirs = [<span class="string">'E:/tmp/02/RealmCore/include'</span>], <span class="comment"># 将realm-core的头文件添加进来</span></span><br><span class="line">                           library_dirs = [<span class="string">'E:/tmp/02/RealmCore/lib'</span>], <span class="comment"># 指定lib的文件夹位置</span></span><br><span class="line">                           extra_compile_args=[<span class="string">"/MT"</span>], <span class="comment"># 有时候用的/MD模式编译，我们的lib是MT，因此一定要指定MT</span></span><br><span class="line">                           libraries = [<span class="string">'realm'</span>], <span class="comment"># realm.lib</span></span><br><span class="line">                           sources=[<span class="string">'realm_wrap.cxx'</span>, <span class="string">'realmHelper.cpp'</span>], <span class="comment"># swig生成的文件以及我自己写的realmHelper接口</span></span><br><span class="line">                           )</span><br><span class="line">​</span><br><span class="line">setup(name=<span class="string">'realmHelper'</span>,</span><br><span class="line">      version=<span class="string">'0.1'</span>,</span><br><span class="line">      author=<span class="string">"SWIG Docs"</span>,</span><br><span class="line">      description=<span class="string">"""sqliteRecovery swig example from docs"""</span>,</span><br><span class="line">      ext_modules=[example_module],</span><br><span class="line">      py_modules=[<span class="string">"realmHelper"</span>],</span><br><span class="line">      )</span><br></pre></td></tr></table></figure>
+<p>编译过程中可能会有x86和x64的不能编译的问题，可以选择直接进入Visual Studio VC目录下选择一个x64 Native Tools Command Prompt for VS</p>
+<p>至此Windows Python模块编译完毕。</p>
+<h3 id="Linux-Python-Module"><a href="#Linux-Python-Module" class="headerlink" title="Linux Python Module"></a>Linux Python Module</h3><p>Linux上面比较简单，由于使用的是GCC编译器，没有那么多坑，我的思路是:</p>
+<p>用CMake将Realm-core安装到Linux上面，这样就可以获取对应静态库，然后手动将自己的接口文件和Swig生成的文件编译成目标文件，最后一起连接成Python动态库。</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 先设定好lib的环境变量，方便编译的时候使用</span></span><br><span class="line"><span class="built_in">export</span> LD_LIBRARY_PATH=/usr/<span class="built_in">local</span>/lib</span><br><span class="line">​</span><br><span class="line"><span class="comment"># 将库放到对应的目录下</span></span><br><span class="line"><span class="comment"># 开始编译目标文件,记得将Python的头文件以及realm-core的头文件传进去</span></span><br><span class="line">g++ -fPIC -c realm_wrap.cpp realmHelper.cpp -I/user/include/python3.7 -I./RealmCore/include</span><br><span class="line">​</span><br><span class="line"><span class="comment"># 这样我们就获得了目标文件.o</span></span><br><span class="line">g++ -shared realm_wrap.o realmHelper.o -lrealm -o _realmHelper.so</span><br></pre></td></tr></table></figure>
+
+<p>用上面的python distutils工具也可以，两者都可以生成最终的Python 模块。</p>
+<h3 id="Golang-Module"><a href="#Golang-Module" class="headerlink" title="Golang Module"></a>Golang Module</h3><p>Goalng仅支持调用C，但是不支持C++，因此只能用C语言调用C++，然后将C接口暴露出来，而SWIG就是做了一层这样的事，我们只需要写好ream.i文件然后通过SWIG生成对应的C接口文件以及Golang调用文件就可以直接用了。</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 如果使用了第三方静态库和头文件，可以将其放在同一级目录下，然后通过#cgo编译链接参数进行指定</span></span><br><span class="line"><span class="comment"># 假设生成了一个realmHelper.go文件，我们只需要写个realmHelper_windows.go即可指定windows下的编译链接参数, realmHelper_unix.go指定unix/linux</span></span><br><span class="line">swig -go -intgosize 64 -c++ realm.i</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> realmHelper</span><br><span class="line"></span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">#cgo CFLAGS: -I $&#123;SRCDIR&#125;/win</span></span><br><span class="line"><span class="comment">#cgo amd64 LDFLAGS: -L$&#123;SRCDIR&#125;/win/lib -lcrypto </span></span><br><span class="line"><span class="comment">#cgo LDFLAGS: -static -Wl,--allow-multiple-definition</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="keyword">import</span> <span class="string">"C"</span></span><br></pre></td></tr></table></figure>
+
+<p>注意Golang用了MinGW的GCC编译器，因此不能调用由MSVC生成的lib。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Golang/" rel="tag"># Golang</a>
+          
+            <a href="/tags/C/" rel="tag"># C++</a>
+          
+            <a href="/tags/Python/" rel="tag"># Python</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/04/27/Golang-%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90/" rel="next" title="Golang 内存对齐">
+                <i class="fa fa-chevron-left"></i> Golang 内存对齐
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/01/22/CGO%E4%BD%BF%E7%94%A8%E6%8A%80%E5%B7%A7/" rel="prev" title="CGO使用技巧">
+                CGO使用技巧 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">yoghourt</p>
+              <p class="site-description motion-element" itemprop="description">what are you waiting for</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/%20%7C%7C%20archive">
+              
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#Windows-x64-Python-Module"><span class="nav-number">1.</span> <span class="nav-text">Windows x64 Python Module</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#切记使用setup-py方式编出来的模块严重依赖Python版本号，如果用3-7编出的模块只能在3-7中使用，否则会报没有此模块。但是如果直接使用g-编出的动态库则没有此限制"><span class="nav-number">1.0.1.</span> <span class="nav-text">切记使用setup.py方式编出来的模块严重依赖Python版本号，如果用3.7编出的模块只能在3.7中使用，否则会报没有此模块。但是如果直接使用g++编出的动态库则没有此限制</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Linux-Python-Module"><span class="nav-number">2.</span> <span class="nav-text">Linux Python Module</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Golang-Module"><span class="nav-number">3.</span> <span class="nav-text">Golang Module</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">yoghourt</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

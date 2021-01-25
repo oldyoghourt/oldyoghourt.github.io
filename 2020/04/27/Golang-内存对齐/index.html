@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Golang," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="&amp;emsp;&amp;emsp;首先抛出一个例子： 1234567type testAlign struct &amp;#123;  a bool  b int16  c int8  d int64  e byte&amp;#125; &amp;emsp;&amp;emsp;以这个结构体来说，如果使用这个结构体，在内存中占用的大小逻辑上应该为: 1+2+1+8+1&#x3D;12 个字节的大小。可是实际情况却不是这样子。我们可以通过Golang的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Golang 内存对齐">
+<meta property="og:url" content="http://yoursite.com/2020/04/27/Golang-%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90/index.html">
+<meta property="og:site_name" content="yoghourt&#39;s blog">
+<meta property="og:description" content="&amp;emsp;&amp;emsp;首先抛出一个例子： 1234567type testAlign struct &amp;#123;  a bool  b int16  c int8  d int64  e byte&amp;#125; &amp;emsp;&amp;emsp;以这个结构体来说，如果使用这个结构体，在内存中占用的大小逻辑上应该为: 1+2+1+8+1&#x3D;12 个字节的大小。可是实际情况却不是这样子。我们可以通过Golang的">
+<meta property="og:image" content="http://yoursite.com/2020/04/27/Golang-%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90/Golang%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90-%E5%86%85%E5%AD%98%E5%88%86%E5%B8%83.png">
+<meta property="article:published_time" content="2020-04-27T11:44:36.000Z">
+<meta property="article:modified_time" content="2021-01-22T01:51:25.984Z">
+<meta property="article:author" content="yoghourt">
+<meta property="article:tag" content="Golang">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://yoursite.com/2020/04/27/Golang-%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90/Golang%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90-%E5%86%85%E5%AD%98%E5%88%86%E5%B8%83.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2020/04/27/Golang-内存对齐/"/>
+
+
+
+
+
+  <title>Golang 内存对齐 | yoghourt's blog</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 4.2.1"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">yoghourt's blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/%20" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/%20" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/04/27/Golang-%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="yoghourt">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="yoghourt's blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Golang 内存对齐</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2020-04-27T19:44:36+08:00">
+                2020-04-27
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Golang/" itemprop="url" rel="index">
+                    <span itemprop="name">Golang</span>
+                  </a>
+                </span>
+
+                
+                
+                  ， 
+                
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Golang/%E8%AE%A1%E7%AE%97%E6%9C%BA/" itemprop="url" rel="index">
+                    <span itemprop="name">计算机</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>&emsp;&emsp;首先抛出一个例子：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> testAlign <span class="keyword">struct</span> &#123;</span><br><span class="line">  a <span class="keyword">bool</span></span><br><span class="line">  b <span class="keyword">int16</span></span><br><span class="line">  c <span class="keyword">int8</span></span><br><span class="line">  d <span class="keyword">int64</span></span><br><span class="line">  e <span class="keyword">byte</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>&emsp;&emsp;以这个结构体来说，如果使用这个结构体，在内存中占用的大小逻辑上应该为: 1+2+1+8+1=12 个字节的大小。可是实际情况却不是这样子。我们可以通过Golang的库函数unsafe.Sizeof看一下具体占用了几个字节。</p>
+<a id="more"></a>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">  <span class="keyword">var</span> x testAlign</span><br><span class="line">  fmt.Println(<span class="string">"the size is:"</span>, unsafe.Sizeof(x))</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">the size is: 24</span><br></pre></td></tr></table></figure>
+<p>&emsp;&emsp;要想知道为什么是24，则就需要明白内存对齐。</p>
+<h4 id="一-什么是内存对齐"><a href="#一-什么是内存对齐" class="headerlink" title="一. 什么是内存对齐"></a>一. 什么是内存对齐</h4><p>&emsp;&emsp;CPU在内存中取数据时既不是一个一个bit挨个读取，也不是一个一个byte读取，而是一次性读取固定的字节数，称为内存的访问粒度,而访问粒度的上限是由总线的宽度决定的，也就是计算机的字长。也就是说4字长的机器，访问粒度可以是2字节、4字节，但不可以是8字节。</p>
+<p>现在打个比方，假设我们在不考虑对齐的情况下将一个byte和int32存放到内存中，假设我们的内存粒度为4。</p>
+<p><img src="/2020/04/27/Golang-%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90/Golang%E5%86%85%E5%AD%98%E5%AF%B9%E9%BD%90-%E5%86%85%E5%AD%98%E5%88%86%E5%B8%83.png" alt="avatar"></p>
+<p>此时下标0存放了我们的byte，而下标1-4则存放了int32。如果我们想要将byte和int32取出来则需要经过以下步骤：</p>
+<ul>
+<li>cpu从下标0一次性读取4个字节的数据，也就是0-3，然后丢掉1-3，留下0，此时byte拿到。</li>
+<li>cpu读取0-3，丢弃0，留下1-3，然后再读取4-7，丢掉5-7，留下4，然后拼接1-4，这样就获取到int32。</li>
+<li>我们可以看到cpu在内存上读了3次，而读取int32就花费了2次。这就是因为int32存放的位置正好处于两个访问粒度的中间。</li>
+<li>但是如果我们存放的时候就直接将int32存放到4-7里面，这样的话是不是只需要读取两次就可以全都读取完呢？因此这就是内存对齐。</li>
+</ul>
+<h4 id="二-为什么要内存对齐"><a href="#二-为什么要内存对齐" class="headerlink" title="二.为什么要内存对齐"></a>二.为什么要内存对齐</h4><ol>
+<li>平台（移植性）原因：不是所有的硬件平台都能够访问任意地址上的任意数据。例如：特定的硬件平台只允许在特定地址获取特定类型的数据，否则会导致异常情况。</li>
+<li>性能原因：若访问未对齐的内存，将会导致 CPU 进行两次内存访问，并且要花费额外的时钟周期来处理对齐及运算。而本身就对齐的内存仅需要一次访问就可以完成读取动作。</li>
+</ol>
+<h4 id="三-什么时候应该内存对齐"><a href="#三-什么时候应该内存对齐" class="headerlink" title="三. 什么时候应该内存对齐"></a>三. 什么时候应该内存对齐</h4><ul>
+<li>既然我们想要采用字节对齐，即采用空间换时间的方法，那么在进行对齐的时候一定要有一套规则，这样我们就可以知道什么情况下才要进行内存对齐。</li>
+</ul>
+<ul>
+<li><p>结构体的成员变量，第一个成员变量的偏移量为 0。往后的每个成员变量的对齐值必须为编译器默认对齐长度（#pragma pack(n)）或当前成员变量类型的长度（unsafe.Sizeof），取两者中最小值作为当前类型的对齐值。其偏移量必须为对齐值的整数倍。</p>
+</li>
+<li><p>结构体本身，对齐值必须为编译器默认对齐长度（#pragma pack(n)）或结构体的所有成员变量类型中的最大长度，取两者中的最小值的最小整数倍作为对齐值。</p>
+</li>
+</ul>
+<p>&emsp;&emsp;根据这个规则，我们现在将最上方我们抛出的例子来进行分析（我的机器是64位，因此编译器默认对齐长度为8字节。）：</p>
+<p>第一个变量为bool，长度为1，因此存放在下标0中。<br>此时内存中应为  | a。</p>
+<p>第二个int16，长度为2，根据规则1，偏移量应该为2的最小整数倍，因此我们应该补齐一位，让int16从下标2开始存放。<br>此时内存中为：<br>| a x b b |。</p>
+<p>第三个为int8，长度为1，因此直接存放就可以了。<br>| a x b b | c。</p>
+<p>第四个为int64, 长度为8, 根据规则1，偏移量应该为8的最小整数倍, 所以应该从下标为8的地方存放。<br>| a x b b | c x x x | d d d d | d d d d |。</p>
+<p>最后一个为byte，长度为1。<br>| a x b b | c x x x | d d d d | d d d d | e。</p>
+<p>&emsp;&emsp;此时的长度为17，但是根据规则2，结构体本身也要对齐，结构体中所有成员变量的最大长度为8.因此最小整数倍应当为24。(8 和 16 肯定不可以，毕竟我们总不能将已放入内存中的数据丢弃)。<br>此时内存中的样子应该为:</p>
+<p>| a x b b | c x x x | d d d d | d d d d | e x x x | x x x x |。</p>
+<p>总共24个字节。</p>
+<h4 id="四，总结"><a href="#四，总结" class="headerlink" title="四，总结"></a>四，总结</h4><p>&emsp;&emsp;我们在编写追求性能的程序时，定义我们的结构体时，就应该考虑到各个成员变量的定义顺序，尽量避免内存对齐。这样我们就不用用空间换取时间，也可以保证好的程序性能。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Golang/" rel="tag"># Golang</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2020/09/11/%E7%BC%96%E8%AF%91Realm-C-%E5%BA%93%E4%B8%BAPython%E6%A8%A1%E5%9D%97/" rel="prev" title="编译Realm C++库为Python & Golang模块">
+                编译Realm C++库为Python & Golang模块 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">yoghourt</p>
+              <p class="site-description motion-element" itemprop="description">what are you waiting for</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/%20%7C%7C%20archive">
+              
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-4"><a class="nav-link" href="#一-什么是内存对齐"><span class="nav-number">1.</span> <span class="nav-text">一. 什么是内存对齐</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#二-为什么要内存对齐"><span class="nav-number">2.</span> <span class="nav-text">二.为什么要内存对齐</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#三-什么时候应该内存对齐"><span class="nav-number">3.</span> <span class="nav-text">三. 什么时候应该内存对齐</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#四，总结"><span class="nav-number">4.</span> <span class="nav-text">四，总结</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">yoghourt</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
