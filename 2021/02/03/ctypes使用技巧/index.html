@@ -79,18 +79,20 @@
 
 
 
-<meta name="description" content="前言&amp;emsp;&amp;emsp;工作中用到CGO的东西远不止上篇内容讲述的那些，平常需求基本是用Go调用第三方库，若第三方库比较小，还可以考虑将整个项目源码置于自己的项目中，但若是第三方库过于庞大，则需要用到其动&#x2F;静态链接库进行调用,并且大部分的项目都是C++代码写的，但Go却不支持C++，因此我们需要找到一种方案支持调用C++代码。">
+<meta name="description" content="&amp;emsp;&amp;emsp;由于Python是解释型语言的原因，导致要求性能的情况下显得有些力不从心，因此可以调用C&#x2F;C++来弥补性能上的缺憾，Python有ctypes模块可以让我们引用C&#x2F;C++模块。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="CGO进阶">
-<meta property="og:url" content="http://yoursite.com/2021/01/25/CGO%E8%BF%9B%E9%98%B6/index.html">
+<meta property="og:title" content="ctypes使用技巧">
+<meta property="og:url" content="http://yoursite.com/2021/02/03/ctypes%E4%BD%BF%E7%94%A8%E6%8A%80%E5%B7%A7/index.html">
 <meta property="og:site_name" content="yoghourt&#39;s blog">
-<meta property="og:description" content="前言&amp;emsp;&amp;emsp;工作中用到CGO的东西远不止上篇内容讲述的那些，平常需求基本是用Go调用第三方库，若第三方库比较小，还可以考虑将整个项目源码置于自己的项目中，但若是第三方库过于庞大，则需要用到其动&#x2F;静态链接库进行调用,并且大部分的项目都是C++代码写的，但Go却不支持C++，因此我们需要找到一种方案支持调用C++代码。">
-<meta property="article:published_time" content="2021-01-25T02:09:01.000Z">
-<meta property="article:modified_time" content="2021-01-29T06:49:21.329Z">
+<meta property="og:description" content="&amp;emsp;&amp;emsp;由于Python是解释型语言的原因，导致要求性能的情况下显得有些力不从心，因此可以调用C&#x2F;C++来弥补性能上的缺憾，Python有ctypes模块可以让我们引用C&#x2F;C++模块。">
+<meta property="og:image" content="http://yoursite.com/2021/02/03/ctypes%E4%BD%BF%E7%94%A8%E6%8A%80%E5%B7%A7/ctypes.png">
+<meta property="article:published_time" content="2021-02-03T08:22:08.000Z">
+<meta property="article:modified_time" content="2021-02-03T08:53:41.754Z">
 <meta property="article:author" content="yoghourt">
 <meta property="article:tag" content="Golang">
 <meta property="article:tag" content="计算机">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://yoursite.com/2021/02/03/ctypes%E4%BD%BF%E7%94%A8%E6%8A%80%E5%B7%A7/ctypes.png">
 
 
 
@@ -120,13 +122,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2021/01/25/CGO进阶/"/>
+  <link rel="canonical" href="http://yoursite.com/2021/02/03/ctypes使用技巧/"/>
 
 
 
 
 
-  <title>CGO进阶 | yoghourt's blog</title>
+  <title>ctypes使用技巧 | yoghourt's blog</title>
   
 
 
@@ -243,7 +245,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/01/25/CGO%E8%BF%9B%E9%98%B6/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/02/03/ctypes%E4%BD%BF%E7%94%A8%E6%8A%80%E5%B7%A7/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="yoghourt">
@@ -260,7 +262,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">CGO进阶</h1>
+          <h1 class="post-title" itemprop="name headline">ctypes使用技巧</h1>
         
 
         <div class="post-meta">
@@ -272,8 +274,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-01-25T10:09:01+08:00">
-                2021-01-25
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-02-03T16:22:08+08:00">
+                2021-02-03
               </time>
             
 
@@ -310,22 +312,17 @@
       
 
       
-        <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>&emsp;&emsp;工作中用到CGO的东西远不止上篇内容讲述的那些，平常需求基本是用Go调用第三方库，若第三方库比较小，还可以考虑将整个项目源码置于自己的项目中，但若是第三方库过于庞大，则需要用到其动/静态链接库进行调用,并且大部分的项目都是C++代码写的，但Go却不支持C++，因此我们需要找到一种方案支持调用C++代码。</p>
+        <p>&emsp;&emsp;由于Python是解释型语言的原因，导致要求性能的情况下显得有些力不从心，因此可以调用C/C++来弥补性能上的缺憾，Python有ctypes模块可以让我们引用C/C++模块。</p>
 <a id="more"></a>
-<h3 id="编译链接"><a href="#编译链接" class="headerlink" title="编译链接"></a>编译链接</h3><p>&emsp;&emsp;既然要用到链接库，必然要用到编译链接参数。CGO给我们提供了CFLAGS, CPPFLAGS, CXXFLAGS, FFLAGS 和 LDFLAGS等参数，使用时有一定规则，必须放在import “C”前面的注释中，并且以#cgo开头。</p>
-<p><strong>CFLAGS</strong>  :对应C语言编译参数(以.c后缀名)<br><strong>CPPFLAGS</strong>: 对应C/C++ 代码编译参数(.c,.cc,.cpp,.cxx)<br><strong>CXXFLAGS</strong>: 对应纯C++编译参数(.cc,.cpp,*.cxx)<br><strong>LDFLAGS</strong> :进行链接的参数</p>
-<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">#cgo CFLAGS: -I $&#123;SRCDIR&#125;/include</span></span><br><span class="line"><span class="comment">#cgo LDFLAGS: -L $&#123;SRCDIR&#125;/lib -lcrypto</span></span><br><span class="line"><span class="comment">#cgo LDFLAGS: -static -Wl, --allow-multiple-definition</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="keyword">import</span> <span class="string">"C"</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span>&#123;&#125;</span><br></pre></td></tr></table></figure>
 
-<h3 id="动-静态链接库"><a href="#动-静态链接库" class="headerlink" title="动/静态链接库"></a>动/静态链接库</h3><p>我们先用C语言做一个动态链接库，然后做一个小demo用Go进行调用。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// add.h</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">add</span><span class="params">(<span class="keyword">int</span>, <span class="keyword">int</span>)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// add.c</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">add</span><span class="params">(<span class="keyword">int</span> x, <span class="keyword">int</span> y)</span></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> x + y;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// compile link</span></span><br><span class="line">gcc -shared -fPIC -o libadd.so add.c</span><br></pre></td></tr></table></figure>
+<h3 id="载入动态链接库"><a href="#载入动态链接库" class="headerlink" title="载入动态链接库"></a>载入动态链接库</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; 目录结构</span><br><span class="line"></span><br><span class="line">├─lib</span><br><span class="line">|  └libfoo.dll</span><br><span class="line">├─main.py</span><br></pre></td></tr></table></figure>
 
-<p>按照下面目录进行存放</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">├─main.go</span><br><span class="line">├─lib</span><br><span class="line">|  └libadd.so</span><br><span class="line">├─include</span><br><span class="line">|    └add.h</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// add.c</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"foo.h"</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">add</span><span class="params">(<span class="keyword">int</span> x, <span class="keyword">int</span> y)</span></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> x + y;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 编译动态链接库</span></span><br><span class="line"><span class="comment">// gcc -shared -fPIC -o libfoo.dll add.c</span></span><br></pre></td></tr></table></figure>
 
-<p>使用动态链接库并进行调用。</p>
-<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">#include &lt;add.h&gt;</span></span><br><span class="line"><span class="comment">#cgo CFLAGS: -I $&#123;SRCDIR&#125;/include</span></span><br><span class="line"><span class="comment">#cgo LDFLAGS: -L $&#123;SRCDIR&#125;/lib -ladd</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="keyword">import</span> <span class="string">"C"</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="string">"fmt"</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    x, y := <span class="number">3</span>, <span class="number">5</span></span><br><span class="line">    fmt.Println(C.add(C.<span class="keyword">int</span>(x), C.<span class="keyword">int</span>(y)))</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> ctypes <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">'__main__'</span>:</span><br><span class="line">    lib = cdll.LoadLibrary(<span class="string">r".\lib\libfoo.dll"</span>)</span><br><span class="line"></span><br><span class="line">    lib.add.argtypes = [c_int32, c_int32] <span class="comment"># 指定函数参数类型</span></span><br><span class="line">    lib.add.restype = c_int32 <span class="comment"># 指定函数返回类型</span></span><br><span class="line"></span><br><span class="line">    print(lib.add(<span class="number">4</span>, <span class="number">5</span>))</span><br></pre></td></tr></table></figure>
 
-<h3 id="Go调用C-代码"><a href="#Go调用C-代码" class="headerlink" title="Go调用C++代码"></a>Go调用C++代码</h3><p>&emsp;&emsp;目前C++代码无法内联到Go中，并且Go无法直接调用外部的cpp源码，最好的办法就是用C代码封装C++代码，然后Go调用C代码。要想C代码调用C++，则需要将C++被调用的接口用extern C包裹起来。</p>
+<h3 id="类型映射"><a href="#类型映射" class="headerlink" title="类型映射"></a>类型映射</h3><p>&emsp;&emsp;使用C函数时需要分别指定函数的参数及返回类型。下面给出常用的类型映射关系: </p>
+<p><img src="/2021/02/03/ctypes%E4%BD%BF%E7%94%A8%E6%8A%80%E5%B7%A7/ctypes.png" alt="avatar"></p>
 
       
     </div>
@@ -358,8 +355,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2021/01/22/CGO%E4%BD%BF%E7%94%A8%E6%8A%80%E5%B7%A7/" rel="next" title="CGO使用技巧">
-                <i class="fa fa-chevron-left"></i> CGO使用技巧
+              <a href="/2021/01/25/CGO%E8%BF%9B%E9%98%B6/" rel="next" title="CGO进阶">
+                <i class="fa fa-chevron-left"></i> CGO进阶
               </a>
             
           </div>
@@ -368,8 +365,8 @@
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2021/02/03/ctypes%E4%BD%BF%E7%94%A8%E6%8A%80%E5%B7%A7/" rel="prev" title="ctypes使用技巧">
-                ctypes使用技巧 <i class="fa fa-chevron-right"></i>
+              <a href="/2021/03/02/msys2%E7%A6%BB%E7%BA%BF%E5%AE%89%E8%A3%85/" rel="prev" title="msys2离线安装">
+                msys2离线安装 <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -502,7 +499,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#编译链接"><span class="nav-number">2.</span> <span class="nav-text">编译链接</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#动-静态链接库"><span class="nav-number">3.</span> <span class="nav-text">动&#x2F;静态链接库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Go调用C-代码"><span class="nav-number">4.</span> <span class="nav-text">Go调用C++代码</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#载入动态链接库"><span class="nav-number">1.</span> <span class="nav-text">载入动态链接库</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#类型映射"><span class="nav-number">2.</span> <span class="nav-text">类型映射</span></a></li></ol></div>
             
 
           </div>
