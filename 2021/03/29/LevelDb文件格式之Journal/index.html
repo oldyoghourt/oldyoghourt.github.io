@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="LevelDB,数据库恢复," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="前言&amp;emsp;&amp;emsp;前面已经介绍LevelDb的版本控制文件MANIFEST，通过这个文件我们可以拿到自数据库创建以来的所有版本，并且随着版本不断的Apply，我们最后会拿到最新的版本信息，从这个信息中我们可以拿到日志文件的seq，从而拿到日志文件的文件名。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDb文件格式之Journal">
+<meta property="og:url" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/index.html">
+<meta property="og:site_name" content="yoghourt&#39;s blog">
+<meta property="og:description" content="前言&amp;emsp;&amp;emsp;前面已经介绍LevelDb的版本控制文件MANIFEST，通过这个文件我们可以拿到自数据库创建以来的所有版本，并且随着版本不断的Apply，我们最后会拿到最新的版本信息，从这个信息中我们可以拿到日志文件的seq，从而拿到日志文件的文件名。">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/fileformat01.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/fileformat02.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex01.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex02.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex03.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex04.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex05.png">
+<meta property="article:published_time" content="2021-03-29T06:03:05.000Z">
+<meta property="article:modified_time" content="2021-03-29T06:19:53.302Z">
+<meta property="article:author" content="yoghourt">
+<meta property="article:tag" content="LevelDB">
+<meta property="article:tag" content="数据库恢复">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/fileformat01.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2021/03/29/LevelDb文件格式之Journal/"/>
+
+
+
+
+
+  <title>LevelDb文件格式之Journal | yoghourt's blog</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 4.2.1"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">yoghourt's blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-question-circle"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="yoghourt">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="yoghourt's blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">LevelDb文件格式之Journal</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-03-29T14:03:05+08:00">
+                2021-03-29
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>&emsp;&emsp;前面已经介绍LevelDb的版本控制文件MANIFEST，通过这个文件我们可以拿到自数据库创建以来的所有版本，并且随着版本不断的Apply，我们最后会拿到最新的版本信息，从这个信息中我们可以拿到日志文件的seq，从而拿到日志文件的文件名。  </p>
+<a id="more"></a>
+<h3 id="二-分析Journal文件"><a href="#二-分析Journal文件" class="headerlink" title="二. 分析Journal文件"></a>二. 分析Journal文件</h3><p>&emsp;&emsp;为了增加读取效率，日志文件中按照block进行划分，每个block的大小为32KiB。每个block中包含了若干个完整的chunk。<br>&emsp;&emsp;一条日志记录包含一个或多个chunk。每个chunk包含了一个7字节大小的header，前4字节是该chunk的校验码，紧接的2字节是该chunk数据的长度，以及最后一个字节是该chunk的类型。其中checksum校验的范围包括chunk的类型以及随后的data数据。<br>&emsp;&emsp;chunk共有四种类型：full，first，middle，last。一条日志记录若只包含一个chunk，则该chunk的类型为full。若一条日志记录包含多个chunk，则这些chunk的第一个类型为first, 最后一个类型为last，中间包含大于等于0个middle类型的chunk。<br>&emsp;&emsp;由于一个block的大小为32KiB，因此当一条日志文件过大时，会将第一部分数据写在第一个block中，且类型为first，若剩余的数据仍然超过一个block的大小，则第二部分数据写在第二个block中，类型为middle，最后剩余的数据写在最后一个block中，类型为last。  </p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/fileformat01.png" alt="avatar"></p>
+<p><strong>Trunk Data Content Format</strong></p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/fileformat02.png" alt="avatar"></p>
+<p>延续上篇文章的第一个没二次改动的demo，简单分析下000001.log文件:  </p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex01.png" alt="avatar"></p>
+<p><strong>CE 43 95 5F</strong> : 前四个字节为CRC32校验码，校验的内容为chunk type + chunk data, 记得进行mask<br><strong>1C 00</strong> :  当前chunk data的长度， LevelDB用的小端模式，因此应当为 00 1C，这里长度为1C (28)。<br><strong>01</strong> : chunk type， 01 代表当前chunk为full chunk type, 表明当前chunk里面的log record是完整的。<br><strong>01 00 00 00 00 00 00 00</strong> :  seq number, 这里为1<br><strong>01 00 00 00</strong> : 当前log record 里面存有几个键值对。<br><strong>01</strong>：随后紧跟着的key-value的类型，有两种KeyTypeDel及KeyTypeVal. 其中Del为0， Val为1.这里说明是正常值，不是删除值。<br>08 : 变长整数，这里是key的长度为8。<br><strong>75 73 65 72 6E 61 6D 65</strong> ： key的内容对应为username。<br><strong>05</strong> : 变长整数，value的长度。<br><strong>6A 65 72 72 79</strong>： value的内容对应为jerry。到达这里的时候一个完整的chunk已经结束，紧接着是另一个chunk。  </p>
+<p>开始第二个chunk<br><strong>7E 30 27 59</strong>： checksum<br><strong>16 00</strong>： 当前chunk data 长度<br><strong>01</strong>： full chunk type<br><strong>02 00 00 00 00 00 00 00</strong>： seq number<br><strong>01 00 00 00</strong>: 当前chunk内部有1个键值对<br><strong>00</strong>: 表示这个键是删除的键，因此只会有key而不会有value。<br><strong>08</strong>：key长度<br><strong>75 73 65 72 6E 61 6D 65</strong>： key的内容为username。  </p>
+<p>我们检验一下data内容超过一个block的情况：</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">content := <span class="string">"0123456789"</span></span><br><span class="line"><span class="keyword">for</span> i := <span class="number">0</span>; i &lt; <span class="number">12</span>; i++&#123;</span><br><span class="line">   content += content</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// content length 40960</span></span><br><span class="line"></span><br><span class="line">err = db.Put([]<span class="keyword">byte</span>(<span class="string">"address"</span>), []<span class="keyword">byte</span>(content), <span class="literal">nil</span>)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">   log.Fatal(err)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex02.png" alt="avatar"></p>
+<p><strong>22 30 5A 6B</strong> ： checksum<br><strong>F9 7F</strong>:  当前chunk 中data的长度为 7F F9 （32761）<br><strong>02</strong>： chunk type, 02为first类型<br><strong>05 00 00 00 00 00 00 00</strong>：seq number<br><strong>01 00 00 00</strong>: 当前chunk内部有1个键值对<br><strong>01</strong>: 正常键<br><strong>07</strong>：Key的长度<br><strong>61 64 64 72 65 73 73</strong> ：key的内容address<br><strong>80 C0 02</strong> ：当前value的长度，LevelDb用变长整数存入，并且是无符号的64位整数，当前值为40960</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// source code</span></span><br><span class="line"><span class="keyword">package</span> binary</span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Uvarint</span><span class="params">(buf []<span class="keyword">byte</span>)</span> <span class="params">(<span class="keyword">uint64</span>, <span class="keyword">int</span>)</span></span> &#123;</span><br><span class="line">   <span class="keyword">var</span> x <span class="keyword">uint64</span></span><br><span class="line">   <span class="keyword">var</span> s <span class="keyword">uint</span></span><br><span class="line">   <span class="keyword">for</span> i, b := <span class="keyword">range</span> buf &#123;</span><br><span class="line">      <span class="keyword">if</span> b &lt; <span class="number">0x80</span> &#123;</span><br><span class="line">         <span class="keyword">if</span> i &gt; <span class="number">9</span> || i == <span class="number">9</span> &amp;&amp; b &gt; <span class="number">1</span> &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="number">0</span>, -(i + <span class="number">1</span>) <span class="comment">// overflow</span></span><br><span class="line">         &#125;</span><br><span class="line">         <span class="keyword">return</span> x | <span class="keyword">uint64</span>(b)&lt;&lt;s, i + <span class="number">1</span></span><br><span class="line">      &#125;</span><br><span class="line">      x |= <span class="keyword">uint64</span>(b&amp;<span class="number">0x7f</span>) &lt;&lt; s</span><br><span class="line">      s += <span class="number">7</span></span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">return</span> <span class="number">0</span>, <span class="number">0</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex03.png" alt="avatar"></p>
+<p><strong>88 6E CD 51</strong>: checksum<br><strong>1F 20</strong>: data length 8223<br><strong>04</strong>: chunk type 04, Last type </p>
+<p>&emsp;&emsp;这里可以简单的计算下：第一个chunk中data的长度为32761，seq number占用8，key-value数量占用4， key类型占用1，key及key的占用长度为8，value长度占用3，因此第一个chunk中存有的字节数为32761-8-4-1-8-3=32750，加上第二个chunk中的8223总共为40960.</p>
+<p>当chunk type为03也就是mid类型时，可以看到data长度为32761,然后加上前面的元信息7字节，总共32768（32*1024）32KiB</p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex04.png" alt="avatar"></p>
+<h3 id="批量插入Key-Value"><a href="#批量插入Key-Value" class="headerlink" title="批量插入Key-Value"></a>批量插入Key-Value</h3><figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ...</span></span><br><span class="line">    b := <span class="built_in">new</span>(leveldb.Batch)</span><br><span class="line">    b.Put([]<span class="keyword">byte</span>(<span class="string">"username"</span>), []<span class="keyword">byte</span>(<span class="string">"tom"</span>))</span><br><span class="line">    b.Put([]<span class="keyword">byte</span>(<span class="string">"age"</span>), []<span class="keyword">byte</span>&#123;<span class="number">30</span>&#125;)</span><br><span class="line">    err = db.Write(b, <span class="literal">nil</span>)</span><br><span class="line">    <span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">       log.Fatal(err)</span><br><span class="line">    &#125;</span><br><span class="line"><span class="comment">// ...</span></span><br></pre></td></tr></table></figure>
+
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex05.png" alt="avatar"></p>
+<p><strong>99 72 2E 62</strong>: checksum<br><strong>21 00</strong>: data length<br><strong>01</strong>: chunk type<br><strong>01 00 00 00 00 00 00  00</strong>: seq number<br><strong>02 00 00 00</strong>: 当前key-value数量<br><strong>01</strong>: 第一个key的类型，表示正常<br><strong>08</strong>： key长度为8<br><strong>75 73 65 72 6E 61 6D 65</strong>:  username key<br><strong>03</strong>： value length<br><strong>74 6F 6D</strong>: tom<br><strong>03</strong>: key length<br><strong>61 67 65</strong>: age<br><strong>01</strong>: value length 1<br><strong>1E</strong>: value 30  </p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/LevelDB/" rel="tag"># LevelDB</a>
+          
+            <a href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93%E6%81%A2%E5%A4%8D/" rel="tag"># 数据库恢复</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/" rel="next" title="LevelDb文件格式之MANIFEST">
+                <i class="fa fa-chevron-left"></i> LevelDb文件格式之MANIFEST
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">yoghourt</p>
+              <p class="site-description motion-element" itemprop="description">what are you waiting for</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">8</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#二-分析Journal文件"><span class="nav-number">2.</span> <span class="nav-text">二. 分析Journal文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#批量插入Key-Value"><span class="nav-number">3.</span> <span class="nav-text">批量插入Key-Value</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">yoghourt</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

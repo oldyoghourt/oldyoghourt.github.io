@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="LevelDB,数据库恢复," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="前言&amp;emsp;&amp;emsp;这系列文章假读者已经明白LevelDB的设计原理，也就是明白各种文件的用途，这篇文章仔细的介绍下LevelDb的版本控制文件-MANIFEST。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDb文件格式之MANIFEST">
+<meta property="og:url" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/index.html">
+<meta property="og:site_name" content="yoghourt&#39;s blog">
+<meta property="og:description" content="前言&amp;emsp;&amp;emsp;这系列文章假读者已经明白LevelDB的设计原理，也就是明白各种文件的用途，这篇文章仔细的介绍下LevelDb的版本控制文件-MANIFEST。">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/dir.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/fileformat.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/record.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/hex01.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/dir02.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/hex02.png">
+<meta property="article:published_time" content="2021-03-29T05:45:42.000Z">
+<meta property="article:modified_time" content="2021-03-29T06:02:40.288Z">
+<meta property="article:author" content="yoghourt">
+<meta property="article:tag" content="LevelDB">
+<meta property="article:tag" content="数据库恢复">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/dir.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2021/03/29/LevelDb文件格式之MANIFEST/"/>
+
+
+
+
+
+  <title>LevelDb文件格式之MANIFEST | yoghourt's blog</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 4.2.1"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">yoghourt's blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-question-circle"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="yoghourt">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="yoghourt's blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">LevelDb文件格式之MANIFEST</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-03-29T13:45:42+08:00">
+                2021-03-29
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>&emsp;&emsp;这系列文章假读者已经明白LevelDB的设计原理，也就是明白各种文件的用途，这篇文章仔细的介绍下LevelDb的版本控制文件-MANIFEST。</p>
+<a id="more"></a>
+
+<h3 id="准备工作"><a href="#准备工作" class="headerlink" title="准备工作"></a>准备工作</h3><p>&emsp;&emsp;用Golang中的<a href="github.com/syndtr/goleveldb/leveldb(v1.0.0)">Leveldb</a>库写一个小的demo方便我们进行分析，我们创建一个新的数据库demo。</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">   <span class="string">"github.com/syndtr/goleveldb/leveldb"</span></span><br><span class="line">   <span class="string">"log"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">   db, err := leveldb.OpenFile(<span class="string">"E:\\demo"</span>, <span class="literal">nil</span>)</span><br><span class="line">   <span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">      log.Fatal(err)</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line">   err = db.Put([]<span class="keyword">byte</span>(<span class="string">"username"</span>), []<span class="keyword">byte</span>(<span class="string">"jerry"</span>), <span class="literal">nil</span>)</span><br><span class="line">   <span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">      log.Fatal(err)</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line">   err = db.Delete([]<span class="keyword">byte</span>(<span class="string">"username"</span>), <span class="literal">nil</span>)</span><br><span class="line">   <span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">      log.Fatal(err)</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line">   err = db.Put([]<span class="keyword">byte</span>(<span class="string">"age"</span>), []<span class="keyword">byte</span>&#123;<span class="number">30</span>&#125;, <span class="literal">nil</span>)</span><br><span class="line">   <span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">      log.Fatal(err)</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line">   err = db.Close()</span><br><span class="line">   <span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">      log.Fatal(err)</span><br><span class="line">   &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>创建之后我们可以看到一下目录结构。</p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/dir.png" alt="avatar"></p>
+<h3 id="分析MANIFEST文件"><a href="#分析MANIFEST文件" class="headerlink" title="分析MANIFEST文件"></a>分析MANIFEST文件</h3><p>&emsp;&emsp;MANIFEST文件用于记录LevelDb版本信息，并且这个文件采取增量的存储方式，记录每一个版本相较于上一个版本的变化情况。一个MANIFEST文件中有多个Record，其中每一个Record都记录了当前版本改变了什么，其中包含增加了那些sstable文件，删除了那些sstable文件，当前Journal日志标号。<br>文件整体结构体：</p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/fileformat.png" alt="avatar"></p>
+<p>record数据结构：</p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/record.png" alt="avatar"></p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// These numbers are written to disk and should not be changed.</span></span><br><span class="line"><span class="keyword">const</span> (</span><br><span class="line">   recComparer    = <span class="number">1</span></span><br><span class="line">   recJournalNum  = <span class="number">2</span></span><br><span class="line">   recNextFileNum = <span class="number">3</span></span><br><span class="line">   recSeqNum      = <span class="number">4</span></span><br><span class="line">   recCompPtr     = <span class="number">5</span></span><br><span class="line">   recDelTable    = <span class="number">6</span></span><br><span class="line">   recAddTable    = <span class="number">7</span></span><br><span class="line">   <span class="comment">// 8 was used for large value refs</span></span><br><span class="line">   recPrevJournalNum = <span class="number">9</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>现在我们开始正式分析MANIFEST文件：</p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/hex01.png" alt="avatar"></p>
+<p><strong>B8 30 54 46</strong>： checksum<br><strong>22 00</strong>： data length<br><strong>01</strong>:  01 Full 02 First  03 Mid 04 Last, 当前Full record表示，data部分承载了全部的数据，并没有溢出到另外一个record中，此部分可以在随后的Jouranl文件格式中看到详细介绍。</p>
+<p>随后开始0x22字节的data部分:<br><strong>01</strong>： comparer name，由于是字符串因此后面会跟一个变长整数0x1A表示长度，6C 65 76 65 6C 64 62 2E 42 79 74 65 77 69 73 65 43 6F 6D 70 61 72 61 74 6F 72 (leveldb.BytewiseComparator)。<br><strong>02</strong>： journal seq num, 这里是00，说明当前版本journal 文件名为000000.log。<br><strong>03</strong>： next file num, 这里是0x01。<br><strong>04</strong>： seq num, 这里是0x00, 正好我们的文件名为MANIFEST-000000。  </p>
+<p>直到这里0x22的data已经分析完毕，至此第一个record已经完全分析结束。随后紧跟着下一个record：<br><strong>A6 91 C7 08</strong>： checksum<br><strong>06 00</strong>： data length， 由于是小端模式，这里是0x06个。<br><strong>01</strong>：Full<br><strong>02</strong>：journal seq num, 0x01<br><strong>03</strong>:    next file num, 0x02<br><strong>04</strong>: seq num, 0x00  </p>
+<h3 id="分析MANIFEST文件格式补充"><a href="#分析MANIFEST文件格式补充" class="headerlink" title="分析MANIFEST文件格式补充"></a>分析MANIFEST文件格式补充</h3><p>&emsp;&emsp;随着上面的分析，对于MANIFEST文件的整体已经有了整体的了解，但是可以看到上面data中仅仅分析了一部分数据结构，还有comp ptrs, add sstable, del sstable。这些表会随着程序的不断运行，随着数据存入不断变大，达到checkpoint, 才会产生sstable 文件。但是我们可以再操作上面的数据库，这样leveldb会直接checkpoint，将log中的日志序列化到sstable。</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">db, err := leveldb.OpenFile(<span class="string">"E:\\demo"</span>, <span class="literal">nil</span>)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">   log.Fatal(err)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">err = db.Put([]<span class="keyword">byte</span>(<span class="string">"username"</span>), []<span class="keyword">byte</span>(<span class="string">"yoghurt"</span>), <span class="literal">nil</span>)</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">   log.Fatal(err)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">err = db.Close()</span><br><span class="line"><span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">   log.Fatal(err)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/dir02.png" alt="avatar"></p>
+<p>可以看到程序运行后，会发现文件发生了很大的变动，其中MANIFEST-000000也变成了000004，打开后我们可以看到：  </p>
+<p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BMANIFEST/hex02.png" alt="avatar"></p>
+<p><strong>07</strong>:  Add table, 0x00 表示Level为0，0x02 seq num, 0x93 0x01 表示文件大小，0B表示min key长度，其中61 67 65 01 03 00 00 00 00 00 00为内部Key (构成方式为userKey + seq &lt; 8 | 1)，后面的0x10表示max key，后面的75 73 65 72 6E 61 6D 65 01 01 00 00 00 00 00 00同理。</p>
+<p>上面解析了07类型的add table, 对于comp ptrs和del table类型根据下方的encode可进行相对应的decode。</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(p *sessionRecord)</span> <span class="title">encode</span><span class="params">(w io.Writer)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">   p.err = <span class="literal">nil</span></span><br><span class="line">   <span class="keyword">if</span> p.has(recComparer) &#123;</span><br><span class="line">      p.putUvarint(w, recComparer)</span><br><span class="line">      p.putBytes(w, []<span class="keyword">byte</span>(p.comparer))</span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">if</span> p.has(recJournalNum) &#123;</span><br><span class="line">      p.putUvarint(w, recJournalNum)</span><br><span class="line">      p.putVarint(w, p.journalNum)</span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">if</span> p.has(recNextFileNum) &#123;</span><br><span class="line">      p.putUvarint(w, recNextFileNum)</span><br><span class="line">      p.putVarint(w, p.nextFileNum)</span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">if</span> p.has(recSeqNum) &#123;</span><br><span class="line">      p.putUvarint(w, recSeqNum)</span><br><span class="line">      p.putUvarint(w, p.seqNum)</span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">for</span> _, r := <span class="keyword">range</span> p.compPtrs &#123;</span><br><span class="line">      p.putUvarint(w, recCompPtr)</span><br><span class="line">      p.putUvarint(w, <span class="keyword">uint64</span>(r.level))</span><br><span class="line">      p.putBytes(w, r.ikey)</span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">for</span> _, r := <span class="keyword">range</span> p.deletedTables &#123;</span><br><span class="line">      p.putUvarint(w, recDelTable)</span><br><span class="line">      p.putUvarint(w, <span class="keyword">uint64</span>(r.level))</span><br><span class="line">      p.putVarint(w, r.num)</span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">for</span> _, r := <span class="keyword">range</span> p.addedTables &#123;</span><br><span class="line">      p.putUvarint(w, recAddTable)</span><br><span class="line">      p.putUvarint(w, <span class="keyword">uint64</span>(r.level))</span><br><span class="line">      p.putVarint(w, r.num)</span><br><span class="line">      p.putVarint(w, r.size)</span><br><span class="line">      p.putBytes(w, r.imin)</span><br><span class="line">      p.putBytes(w, r.imax)</span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">return</span> p.err</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/LevelDB/" rel="tag"># LevelDB</a>
+          
+            <a href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93%E6%81%A2%E5%A4%8D/" rel="tag"># 数据库恢复</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/03/02/msys2%E7%A6%BB%E7%BA%BF%E5%AE%89%E8%A3%85/" rel="next" title="msys2离线安装">
+                <i class="fa fa-chevron-left"></i> msys2离线安装
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/" rel="prev" title="LevelDb文件格式之Journal">
+                LevelDb文件格式之Journal <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">yoghourt</p>
+              <p class="site-description motion-element" itemprop="description">what are you waiting for</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">8</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#准备工作"><span class="nav-number">2.</span> <span class="nav-text">准备工作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#分析MANIFEST文件"><span class="nav-number">3.</span> <span class="nav-text">分析MANIFEST文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#分析MANIFEST文件格式补充"><span class="nav-number">4.</span> <span class="nav-text">分析MANIFEST文件格式补充</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">yoghourt</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
