@@ -93,7 +93,7 @@
 <meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex04.png">
 <meta property="og:image" content="http://yoursite.com/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/hex05.png">
 <meta property="article:published_time" content="2021-03-29T06:03:05.000Z">
-<meta property="article:modified_time" content="2021-03-29T06:19:53.302Z">
+<meta property="article:modified_time" content="2021-03-31T03:00:40.494Z">
 <meta property="article:author" content="yoghourt">
 <meta property="article:tag" content="LevelDB">
 <meta property="article:tag" content="数据库恢复">
@@ -320,7 +320,7 @@
       
         <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>&emsp;&emsp;前面已经介绍LevelDb的版本控制文件MANIFEST，通过这个文件我们可以拿到自数据库创建以来的所有版本，并且随着版本不断的Apply，我们最后会拿到最新的版本信息，从这个信息中我们可以拿到日志文件的seq，从而拿到日志文件的文件名。  </p>
 <a id="more"></a>
-<h3 id="二-分析Journal文件"><a href="#二-分析Journal文件" class="headerlink" title="二. 分析Journal文件"></a>二. 分析Journal文件</h3><p>&emsp;&emsp;为了增加读取效率，日志文件中按照block进行划分，每个block的大小为32KiB。每个block中包含了若干个完整的chunk。<br>&emsp;&emsp;一条日志记录包含一个或多个chunk。每个chunk包含了一个7字节大小的header，前4字节是该chunk的校验码，紧接的2字节是该chunk数据的长度，以及最后一个字节是该chunk的类型。其中checksum校验的范围包括chunk的类型以及随后的data数据。<br>&emsp;&emsp;chunk共有四种类型：full，first，middle，last。一条日志记录若只包含一个chunk，则该chunk的类型为full。若一条日志记录包含多个chunk，则这些chunk的第一个类型为first, 最后一个类型为last，中间包含大于等于0个middle类型的chunk。<br>&emsp;&emsp;由于一个block的大小为32KiB，因此当一条日志文件过大时，会将第一部分数据写在第一个block中，且类型为first，若剩余的数据仍然超过一个block的大小，则第二部分数据写在第二个block中，类型为middle，最后剩余的数据写在最后一个block中，类型为last。  </p>
+<h3 id="分析Journal文件"><a href="#分析Journal文件" class="headerlink" title="分析Journal文件"></a>分析Journal文件</h3><p>&emsp;&emsp;为了增加读取效率，日志文件中按照block进行划分，每个block的大小为32KiB。每个block中包含了若干个完整的chunk。<br>&emsp;&emsp;一条日志记录包含一个或多个chunk。每个chunk包含了一个7字节大小的header，前4字节是该chunk的校验码，紧接的2字节是该chunk数据的长度，以及最后一个字节是该chunk的类型。其中checksum校验的范围包括chunk的类型以及随后的data数据。<br>&emsp;&emsp;chunk共有四种类型：full，first，middle，last。一条日志记录若只包含一个chunk，则该chunk的类型为full。若一条日志记录包含多个chunk，则这些chunk的第一个类型为first, 最后一个类型为last，中间包含大于等于0个middle类型的chunk。<br>&emsp;&emsp;由于一个block的大小为32KiB，因此当一条日志文件过大时，会将第一部分数据写在第一个block中，且类型为first，若剩余的数据仍然超过一个block的大小，则第二部分数据写在第二个block中，类型为middle，最后剩余的数据写在最后一个block中，类型为last。  </p>
 <p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/fileformat01.png" alt="avatar"></p>
 <p><strong>Trunk Data Content Format</strong></p>
 <p><img src="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/fileformat02.png" alt="avatar"></p>
@@ -384,6 +384,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/" rel="prev" title="LevelDb文件格式之sstable">
+                LevelDb文件格式之sstable <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -460,7 +464,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">8</span>
+                  <span class="site-state-item-count">9</span>
                   <span class="site-state-item-name">日志</span>
                 </a>
               </div>
@@ -515,7 +519,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#二-分析Journal文件"><span class="nav-number">2.</span> <span class="nav-text">二. 分析Journal文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#批量插入Key-Value"><span class="nav-number">3.</span> <span class="nav-text">批量插入Key-Value</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#分析Journal文件"><span class="nav-number">2.</span> <span class="nav-text">分析Journal文件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#批量插入Key-Value"><span class="nav-number">3.</span> <span class="nav-text">批量插入Key-Value</span></a></li></ol></div>
             
 
           </div>

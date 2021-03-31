@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="LevelDB,数据库恢复," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="前言&amp;emsp;&amp;emsp;前篇介绍了LevelDb的写前日志Journal，这篇文章主要介绍下sstable文件，LevelDb以前的版本中sstable文件的后缀是sst，现在已经变为了ldb文件。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LevelDb文件格式之sstable">
+<meta property="og:url" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/index.html">
+<meta property="og:site_name" content="yoghourt&#39;s blog">
+<meta property="og:description" content="前言&amp;emsp;&amp;emsp;前篇介绍了LevelDb的写前日志Journal，这篇文章主要介绍下sstable文件，LevelDb以前的版本中sstable文件的后缀是sst，现在已经变为了ldb文件。">
+<meta property="og:image" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/overview.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex01.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/format.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex02.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex03.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex04.png">
+<meta property="og:image" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex05.png">
+<meta property="article:published_time" content="2021-03-31T03:01:41.000Z">
+<meta property="article:modified_time" content="2021-03-31T03:14:30.831Z">
+<meta property="article:author" content="yoghourt">
+<meta property="article:tag" content="LevelDB">
+<meta property="article:tag" content="数据库恢复">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/overview.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2021/03/31/LevelDb文件格式之sstable/"/>
+
+
+
+
+
+  <title>LevelDb文件格式之sstable | yoghourt's blog</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 4.2.1"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">yoghourt's blog</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-question-circle"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="yoghourt">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="yoghourt's blog">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">LevelDb文件格式之sstable</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-03-31T11:01:41+08:00">
+                2021-03-31
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>&emsp;&emsp;前篇介绍了LevelDb的写前日志Journal，这篇文章主要介绍下sstable文件，LevelDb以前的版本中sstable文件的后缀是sst，现在已经变为了ldb文件。</p>
+<a id="more"></a>
+
+<h3 id="sstable文件总体概览"><a href="#sstable文件总体概览" class="headerlink" title="sstable文件总体概览"></a>sstable文件总体概览</h3><p>&emsp;&emsp;ldb文件由一系列的block与footer组成，其中block分为四种，分别为Data Block，Meta Block, MetaIndex Block, Index Block。<br>&emsp;&emsp;data block包含了所有的key-value数据，Meta Block包含Filter信息，MetaIndex Block包含了Filter Block的起始地址大小等信息，Index Block包含了Data Block的起始地址大小等信息。<br>&emsp;&emsp;Footer包含了MetaIndex block和Index Block的偏移地址及一串magic number。</p>
+<p><img src="/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/overview.png" alt="avatar"></p>
+<p><strong>Footer Format</strong></p>
+<ul>
+<li>Footer由三部分组成：</li>
+<li>MetaIndex Block索引信息</li>
+<li>Index Block 索引信息</li>
+<li>填充字节</li>
+<li>Magic Number</li>
+</ul>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> blockHandle <span class="keyword">struct</span> &#123;</span><br><span class="line">   offset, length <span class="keyword">uint64</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">decodeBlockHandle</span><span class="params">(src []<span class="keyword">byte</span>)</span> <span class="params">(blockHandle, <span class="keyword">int</span>)</span></span> &#123;</span><br><span class="line">   offset, n := binary.Uvarint(src)</span><br><span class="line">   length, m := binary.Uvarint(src[n:])</span><br><span class="line">   <span class="keyword">if</span> n == <span class="number">0</span> || m == <span class="number">0</span> &#123;</span><br><span class="line">      <span class="keyword">return</span> blockHandle&#123;&#125;, <span class="number">0</span></span><br><span class="line">   &#125;</span><br><span class="line">   <span class="keyword">return</span> blockHandle&#123;offset, length&#125;, n + m</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>&emsp;&emsp;可以在decodeBlockHandle中看到用到了变长整数，变长整数最大可用10字节，blockHandle有两个字段，因此占用20个字节，整体算下来总共占用40字节，但由于是变长整数，因此没有用到的字节则进行填充。</p>
+<p><img src="/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex01.png" alt="avatar"></p>
+<p>简单的分析下：<br><strong>F3 08</strong>:     MetaIndex block的偏移地址<br><strong>30</strong>：     MetaIndex block占用的大小<br><strong>A8 09</strong>:      Index Block偏移地址<br><strong>23</strong>：      Index Block占用大小<br><strong>00 … 00</strong> :  填充字节<br><strong>57 FB 80 8B 24 75 47 DB</strong>： Magic Number  </p>
+<p><strong>Block Format</strong></p>
+<ul>
+<li>Block由2个大部分组成：</li>
+<li>data</li>
+<li>block trailer</li>
+</ul>
+<p>其中data 由一系列entry组成:<br><img src="/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/format.png" alt="avatar"></p>
+<p>&emsp;&emsp;为了节省空间，LevelDb对于有共同前缀的Key进行了复用，因此一个Entry中有复用前缀的长度及未复用的长度，考虑到一旦损坏将造成大面积的信息丢失，因此加入了重启点，每隔一定的Entry将会完全保留Key，开始新的复用。重启点放在了block trailer中。</p>
+<p>每个Block后面会紧跟当前block的压缩方式及Checksum。其中压缩类型占用1个字节，checksum占用4字节。</p>
+<h3 id="实战解析"><a href="#实战解析" class="headerlink" title="实战解析"></a>实战解析</h3><p>采用前面MANIFEST中第二个demo进行实战分析，我们分析这个000002.ldb这个文件：</p>
+<p><img src="/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex02.png" alt="avatar"></p>
+<p>Footer：<br><img src="/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex03.png" alt="avatar"></p>
+<p>MetaIndex Block： 偏移地址 0x3A 大小 0x0A<br>Index Block： 偏移地址 0x49 占用大小 0x15</p>
+<p>&emsp;&emsp;这里我仅仅介绍如何拿到存入的数据，也就是Data Block，对于Meta Block就不做介绍，Meta Block中保存了Bloom Filter的一些信息。</p>
+<p>这里直接跳转到Index Block中，也就是偏移地址为0x49。</p>
+<p><img src="/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex04.png" alt="avatar"></p>
+<p>&emsp;&emsp;这里我们可以看到偏移地址0x49随后的0x15字节便是Index Block的内容，这里我们要先看是否进行了压缩，可以看到Index block随后的5字节中包含了压缩类型和checksum。这里的第一个字节是0x01，说明使用了Snappy Compression，因此我们需要进行解压缩：</p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">   <span class="string">"fmt"</span></span><br><span class="line">   <span class="string">"github.com/golang/snappy"</span></span><br><span class="line">   <span class="string">"log"</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">   indexBlock := []<span class="keyword">byte</span>&#123;<span class="number">0x16</span>, <span class="number">0x14</span>, <span class="number">0x00</span>, <span class="number">0x09</span>,</span><br><span class="line">                   <span class="number">0x02</span>, <span class="number">0x76</span>, <span class="number">0x01</span>, <span class="number">0xFF</span>,</span><br><span class="line">                   <span class="number">0x09</span>, <span class="number">0x01</span>, <span class="number">0x24</span>, <span class="number">0x00</span>,</span><br><span class="line">                   <span class="number">0x35</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>,</span><br><span class="line">                   <span class="number">0x00</span>, <span class="number">0x01</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x00</span>&#125;</span><br><span class="line"></span><br><span class="line">   decodedLen, err := snappy.DecodedLen(indexBlock)</span><br><span class="line">   <span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">      log.Fatal(err)</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line">   result := <span class="built_in">make</span>([]<span class="keyword">byte</span>, decodedLen)</span><br><span class="line">   decode, err := snappy.Decode(result, indexBlock)</span><br><span class="line">   <span class="keyword">if</span> err != <span class="literal">nil</span>&#123;</span><br><span class="line">      log.Fatal(err)</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line">   fmt.Println(decode)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; uncompression </span><br><span class="line">[0 9 2 118 1 255 255 255 255 255 255 255 0 53 0 0 0 0 1 0 0 0]</span><br></pre></td></tr></table></figure>
+
+<p><strong>Data Content</strong>:<br><strong>0</strong>: key shared length<br><strong>9</strong>: key unshared length<br><strong>2</strong>: value length<br><strong>118 1 225 255 255 255 255 255 255</strong>: key content<br><strong>0 53</strong>: value, 这里是data Block索引信息，表示当前data block位于偏移位置0，长度为53字节。  </p>
+<p><strong>Block Trailer</strong><br><strong>0 0 0 0</strong>： 重启点<br><strong>1 0 0 0</strong>:     重启点个数，小端模式，这里数量为1  </p>
+<p>拿到Data Block索引信息之后跳转到偏移为0的位置，拿53字节数据：  </p>
+<p><img src="/2021/03/31/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8Bsstable/hex05.png" alt="avatar"></p>
+<p>&emsp;&emsp;拿到Block后应该先去看压缩方式，需要的话可以计算checksum，这里的checksum是压缩后的内容的crc32。这里压缩方式为01，表示snappy compress。解压后为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">[0 11 1 97 103 101 1 3 0 0 0 0 0 0 30 0 </span><br><span class="line">16 0 117 115 101 114 110 97 109 101 0 2 0 0 0 0 </span><br><span class="line">0 0 8 8 5 1 1 0 0 0 0 0 0 106 101 114 </span><br><span class="line">114 121 0 0 0 0 1 0 0 0]</span><br></pre></td></tr></table></figure>
+
+<p>这里先拿Block Trailer  </p>
+<p><strong>1 0 0 0</strong>： 重启点个数为1<br><strong>0 0 0 0</strong>： 重启点为偏移0处  </p>
+<p>Data Content:<br><strong>0</strong>: key shared<br><strong>11</strong>: key unshared len<br><strong>1</strong>: value len<br><strong>97 103 101 1 3 0 0 0 0 0 0</strong>: 这里的key为内部key，组成方式前面说过了，简单解析下user key 为 97 103 101(age)，key type为 1，表示正常数据， seq number 为 3.<br><strong>30</strong>: value  </p>
+<p>至此第一个Entry结束，接下来开始第二个Entry。<br><strong>0</strong>： key shared len<br><strong>16</strong>: key unshared len<br><strong>0</strong>: value len,看到value为0我们可以大致直到值类型为删除类型<br><strong>117 115 101 114 110 97 109 101 0 2 0 0 0 0 0 0</strong> ： user key 117 115 101 114 110 97 109 101(username), 值类型为0表示删除数据，seq number为2.  </p>
+<p>第二个Entry结束，开始第三个：<br><strong>8</strong>：key shared len，这里为8表示与上一个Entry存在复用，使用上一个key的前8个字节，也就是username。<br><strong>8</strong>： key unsahred len<br><strong>5</strong>: value len<br><strong>1 1 0 0 0 0 0 0</strong> : 这里存在复用，user key 为username， 值类型为1表示正常，seq number为1。user key与上面的一致，这里我们看seq number，谁大谁就是最新的。<br><strong>106 101 114 114 121</strong>： value 为 jerry。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/LevelDB/" rel="tag"># LevelDB</a>
+          
+            <a href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93%E6%81%A2%E5%A4%8D/" rel="tag"># 数据库恢复</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/03/29/LevelDb%E6%96%87%E4%BB%B6%E6%A0%BC%E5%BC%8F%E4%B9%8BJournal/" rel="next" title="LevelDb文件格式之Journal">
+                <i class="fa fa-chevron-left"></i> LevelDb文件格式之Journal
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">yoghourt</p>
+              <p class="site-description motion-element" itemprop="description">what are you waiting for</p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">9</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">7</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#sstable文件总体概览"><span class="nav-number">2.</span> <span class="nav-text">sstable文件总体概览</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#实战解析"><span class="nav-number">3.</span> <span class="nav-text">实战解析</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">yoghourt</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
